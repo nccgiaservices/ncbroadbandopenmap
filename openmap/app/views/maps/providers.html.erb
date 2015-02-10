@@ -1,0 +1,20 @@
+
+<% @serving_providers.group_by(&:non_res_only).each do |non_res, serving_providers| %>
+  <% if (non_res == 'Y') %>
+    <tr class="provider_divider">
+      <th></th>
+      <th>Non-Residential Provider</th>
+    </tr>
+  <% end %>
+  <% serving_providers.each do |sp| %>
+    <tr>
+      <%# TODO: get the MapStyle color into the view and into the data, and put right in the style here %>
+      <%= content_tag :td, sp.technology_name, {class: "transtech tt#{sp.technology_name}",
+                                                style: "cursor: pointer; background-color: #{sp.technology_color}",
+                                                onclick: sp.technology_description.present? ? "window.alert('#{sp.technology_description}')" : "" } %>
+      <%= content_tag :td, ( (sp.provider_website.present? ? link_to(sp.short_name, sp.provider_website) : sp.short_name) +
+                             '<br><span class="speed_tier down">Down Speed: ' + sp.speed_down_description + '</span>' +
+                             '<br><span class="speed_tier up">Up Speed: ' + sp.speed_up_description + '</span>' ).html_safe, {class: "sp details", colspan: "3" } %>
+    </tr>
+  <% end %>
+<% end %>

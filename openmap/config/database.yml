@@ -1,0 +1,31 @@
+development:
+  adapter: postgis
+  encoding: unicode
+  host: localhost
+  database: openmap
+  username: topsail
+  password: topsail
+
+test:
+  adapter: postgis
+  encoding: unicode
+  host: localhost
+  database: openmap_test
+  username: topsail
+  password: topsail
+
+staging:
+  adapter: postgis
+  encoding: unicode
+  host: localhost
+  database: openmap
+  username: openmap
+  password: openmap_staging
+
+production:
+  adapter: postgis
+  encoding: unicode
+  host: ncc432.its.state.nc.us
+  database: openmap
+  username: openmap
+  password: openmap_production

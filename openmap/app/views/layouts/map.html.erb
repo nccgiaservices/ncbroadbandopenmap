@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title><%= @map && @map.name %></title>
+    <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1" />
+
+    <%= stylesheet_link_tag "map", :media => "all" %>
+    <!--[if lt IE 9]>
+      <link rel="stylesheet" type="text/css" media="all" href="stylesheets/map-style-ie.css"/>
+    <![endif]-->
+    <%= yield :style %>
+
+    <%= javascript_include_tag 'map' %>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDnfWQf2olNFA68n6CIykAsk2R5M3TRhVU&libraries=places"></script>
+    <%= yield :script %>
+  </head>
+  <body>
+
+    <%= yield %>
+
+  </body>
+</html>

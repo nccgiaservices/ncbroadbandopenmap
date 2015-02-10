@@ -1,0 +1,360 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- SQL XML created by WWW SQL Designer, http://code.google.com/p/wwwsqldesigner/ -->
+<!-- Active URL: http://localhost/~rlow/wwwsqldesigner-2.7/ -->
+<sql>
+<datatypes db="mysql">
+  <group label="Numeric" color="rgb(238,238,170)">
+    <type label="TINYINT" length="0" sql="TINYINT" quote=""/>
+    <type label="SMALLINT" length="0" sql="SMALLINT" quote=""/>
+    <type label="MEDIUMINT" length="0" sql="MEDIUMINT" quote=""/>
+    <type label="INT" length="0" sql="INT" quote=""/>
+    <type label="Integer" length="0" sql="INTEGER" quote=""/>
+    <type label="BIGINT" length="0" sql="BIGINT" quote=""/>
+    <type label="Decimal" length="1" sql="DECIMAL" re="DEC" quote=""/>
+    <type label="Single precision" length="0" sql="FLOAT" quote=""/>
+    <type label="Double precision" length="0" sql="DOUBLE" re="DOUBLE" quote=""/>
+  </group>
+
+  <group label="Character" color="rgb(255,200,200)">
+    <type label="Char" length="1" sql="CHAR" quote="'"/>
+    <type label="Varchar" length="1" sql="VARCHAR" quote="'"/>
+    <type label="Text" length="0" sql="MEDIUMTEXT" re="TEXT" quote="'"/>
+    <type label="Binary" length="1" sql="BINARY" quote="'"/>
+    <type label="Varbinary" length="1" sql="VARBINARY" quote="'"/>
+    <type label="BLOB" length="0" sql="BLOB" re="BLOB" quote="'"/>
+  </group>
+
+  <group label="Date &amp; Time" color="rgb(200,255,200)">
+    <type label="Date" length="0" sql="DATE" quote="'"/>
+    <type label="Time" length="0" sql="TIME" quote="'"/>
+    <type label="Datetime" length="0" sql="DATETIME" quote="'"/>
+    <type label="Year" length="0" sql="YEAR" quote=""/>
+    <type label="Timestamp" length="0" sql="TIMESTAMP" quote="'"/>
+  </group>
+
+  <group label="Miscellaneous" color="rgb(200,200,255)">
+    <type label="ENUM" length="1" sql="ENUM" quote=""/>
+    <type label="SET" length="1" sql="SET" quote=""/>
+    <type label="Bit" length="0" sql="bit" quote=""/>
+  </group>
+</datatypes><table x="268" y="174" name="county">
+<row name="id" null="1" autoincrement="1">
+<datatype>TINYINT</datatype>
+<default>NULL</default></row>
+<row name="state_id" null="1" autoincrement="0">
+<datatype>TINYINT</datatype>
+<default>NULL</default><relation table="state" row="id" />
+</row>
+<row name="gid" null="1" autoincrement="0">
+<datatype>TINYINT</datatype>
+<default>NULL</default></row>
+<row name="name" null="1" autoincrement="0">
+<datatype>VARCHAR</datatype>
+<default>NULL</default></row>
+<row name="statefp" null="1" autoincrement="0">
+<datatype>VARCHAR</datatype>
+<default>NULL</default></row>
+<row name="geoid" null="1" autoincrement="0">
+<datatype>VARCHAR</datatype>
+<default>NULL</default></row>
+<row name="geometry" null="1" autoincrement="0">
+<datatype>SET</datatype>
+<default>NULL</default></row>
+<key type="PRIMARY" name="">
+<part>id</part>
+</key>
+</table>
+<table x="255" y="585" name="zip_code">
+<row name="id" null="1" autoincrement="1">
+<datatype>TINYINT</datatype>
+<default>NULL</default></row>
+<row name="gid" null="1" autoincrement="0">
+<datatype>TINYINT</datatype>
+<default>NULL</default></row>
+<row name="code" null="1" autoincrement="0">
+<datatype>VARCHAR</datatype>
+<default>NULL</default></row>
+<row name="geoid" null="1" autoincrement="0">
+<datatype>VARCHAR</datatype>
+<default>NULL</default></row>
+<row name="geometry" null="1" autoincrement="0">
+<datatype>SET</datatype>
+<default>NULL</default></row>
+<key type="PRIMARY" name="">
+<part>id</part>
+</key>
+</table>
+<table x="265" y="378" name="district">
+<row name="id" null="1" autoincrement="1">
+<datatype>TINYINT</datatype>
+<default>NULL</default></row>
+<row name="state_id" null="1" autoincrement="0">
+<datatype>INT</datatype>
+<default>NULL</default><relation table="state" row="id" />
+</row>
+<row name="gid" null="1" autoincrement="0">
+<datatype>TINYINT</datatype>
+<default>NULL</default></row>
+<row name="name" null="1" autoincrement="0">
+<datatype>VARCHAR</datatype>
+<default>NULL</default></row>
+<row name="geoid" null="1" autoincrement="0">
+<datatype>VARCHAR</datatype>
+<default>NULL</default></row>
+<row name="representative" null="1" autoincrement="0">
+<datatype>TINYINT</datatype>
+<default>NULL</default></row>
+<row name="geometry" null="1" autoincrement="0">
+<datatype>SET</datatype>
+<default>NULL</default></row>
+<key type="PRIMARY" name="">
+<part>id</part>
+</key>
+</table>
+<table x="1334" y="352" name="provider">
+<row name="id" null="1" autoincrement="1">
+<datatype>TINYINT</datatype>
+<default>NULL</default></row>
+<row name="name" null="1" autoincrement="0">
+<datatype>VARCHAR</datatype>
+<default>NULL</default></row>
+<row name="name_dba" null="1" autoincrement="0">
+<datatype>VARCHAR</datatype>
+<default>NULL</default></row>
+<row name="name_short" null="1" autoincrement="0">
+<datatype>VARCHAR</datatype>
+<default>NULL</default></row>
+<row name="website" null="1" autoincrement="0">
+<datatype>VARCHAR</datatype>
+<default>NULL</default></row>
+<key type="PRIMARY" name="">
+<part>id</part>
+</key>
+</table>
+<table x="1072" y="425" name="provider_service">
+<row name="id" null="1" autoincrement="1">
+<datatype>TINYINT</datatype>
+<default>NULL</default></row>
+<row name="provider_id" null="1" autoincrement="0">
+<datatype>TINYINT</datatype>
+<default>NULL</default><relation table="provider" row="id" />
+</row>
+<row name="technology_id" null="1" autoincrement="0">
+<datatype>TINYINT</datatype>
+<default>NULL</default><relation table="technology" row="id" />
+</row>
+<row name="speed_up" null="1" autoincrement="0">
+<datatype>TINYINT</datatype>
+<default>NULL</default><relation table="speed_tier" row="id" />
+</row>
+<row name="speed_down" null="1" autoincrement="0">
+<datatype>TINYINT</datatype>
+<default>NULL</default><relation table="speed_tier" row="id" />
+</row>
+<row name="commercial" null="1" autoincrement="0">
+<datatype>TINYINT</datatype>
+<default>NULL</default></row>
+<row name="residential" null="1" autoincrement="0">
+<datatype>INT</datatype>
+<default>NULL</default></row>
+<row name="geometry" null="1" autoincrement="0">
+<datatype>SET</datatype>
+<default>NULL</default></row>
+<key type="PRIMARY" name="">
+<part>id</part>
+</key>
+</table>
+<table x="1399" y="576" name="speed_tier">
+<row name="id" null="1" autoincrement="1">
+<datatype>TINYINT</datatype>
+<default>NULL</default></row>
+<row name="code" null="1" autoincrement="0">
+<datatype>TINYINT</datatype>
+<default>NULL</default></row>
+<row name="description" null="1" autoincrement="0">
+<datatype>MEDIUMTEXT</datatype>
+<default>NULL</default></row>
+<key type="PRIMARY" name="">
+<part>id</part>
+</key>
+</table>
+<table x="800" y="396" name="technology">
+<row name="id" null="1" autoincrement="1">
+<datatype>TINYINT</datatype>
+<default>NULL</default></row>
+<row name="name" null="1" autoincrement="0">
+<datatype>VARCHAR</datatype>
+<default>NULL</default></row>
+<row name="description" null="1" autoincrement="0">
+<datatype>MEDIUMTEXT</datatype>
+<default>NULL</default></row>
+<row name="postion" null="1" autoincrement="0">
+<datatype>TINYINT</datatype>
+<default>NULL</default></row>
+<row name="geometry" null="1" autoincrement="0">
+<datatype>SET</datatype>
+<default>NULL</default></row>
+<key type="PRIMARY" name="">
+<part>id</part>
+</key>
+</table>
+<table x="857" y="59" name="tech_type">
+<row name="id" null="1" autoincrement="1">
+<datatype>TINYINT</datatype>
+<default>NULL</default></row>
+<row name="technology_id" null="1" autoincrement="0">
+<datatype>TINYINT</datatype>
+<default>NULL</default><relation table="technology" row="id" />
+</row>
+<row name="code" null="1" autoincrement="0">
+<datatype>VARCHAR</datatype>
+<default>NULL</default></row>
+<row name="name" null="1" autoincrement="0">
+<datatype>VARCHAR</datatype>
+<default>NULL</default></row>
+<key type="PRIMARY" name="">
+<part>id</part>
+</key>
+</table>
+<table x="591" y="163" name="map_style">
+<row name="id" null="1" autoincrement="1">
+<datatype>TINYINT</datatype>
+<default>NULL</default></row>
+<row name="map_id" null="1" autoincrement="0">
+<datatype>TINYINT</datatype>
+<default>NULL</default><relation table="map" row="id" />
+</row>
+<row name="name" null="1" autoincrement="0">
+<datatype>VARCHAR</datatype>
+<default>NULL</default></row>
+<row name="color" null="1" autoincrement="0">
+<datatype>VARCHAR</datatype>
+<default>NULL</default></row>
+<row name="opacity" null="1" autoincrement="0">
+<datatype>DECIMAL</datatype>
+<default>NULL</default></row>
+<row name="layerable_id" null="1" autoincrement="0">
+<datatype>TINYINT</datatype>
+<default>NULL</default><relation table="technology" row="id" />
+<relation table="cai_category" row="id" />
+</row>
+<key type="PRIMARY" name="">
+<part>id</part>
+</key>
+</table>
+<table x="360" y="26" name="map">
+<row name="id" null="1" autoincrement="1">
+<datatype>TINYINT</datatype>
+<default>NULL</default></row>
+<row name="state_id" null="1" autoincrement="0">
+<datatype>TINYINT</datatype>
+<default>NULL</default><relation table="state" row="id" />
+</row>
+<row name="name" null="1" autoincrement="0">
+<datatype>VARCHAR</datatype>
+<default>NULL</default></row>
+<row name="geometry" null="1" autoincrement="0">
+<datatype>SET</datatype>
+<default>NULL</default></row>
+<key type="PRIMARY" name="">
+<part>id</part>
+</key>
+</table>
+<table x="1351" y="162" name="provider_frn">
+<row name="id" null="1" autoincrement="1">
+<datatype>TINYINT</datatype>
+<default>NULL</default></row>
+<row name="frn" null="1" autoincrement="0">
+<datatype>VARCHAR</datatype>
+<default>NULL</default></row>
+<row name="provider_id" null="1" autoincrement="0">
+<datatype>TINYINT</datatype>
+<default>NULL</default><relation table="provider" row="id" />
+</row>
+<key type="PRIMARY" name="">
+<part>id</part>
+</key>
+</table>
+<table x="248" y="753" name="institution">
+<row name="id" null="1" autoincrement="1">
+<datatype>TINYINT</datatype>
+<default>NULL</default></row>
+<row name="cai_category_id" null="1" autoincrement="0">
+<datatype>TINYINT</datatype>
+<default>NULL</default><relation table="cai_category" row="id" />
+</row>
+<row name="name" null="1" autoincrement="0">
+<datatype>VARCHAR</datatype>
+<default>NULL</default></row>
+<row name="geometry" null="1" autoincrement="0">
+<datatype>SET</datatype>
+<default>NULL</default></row>
+<key type="PRIMARY" name="">
+<part>id</part>
+</key>
+</table>
+<table x="42" y="153" name="state">
+<row name="id" null="1" autoincrement="1">
+<datatype>TINYINT</datatype>
+<default>NULL</default></row>
+<row name="gid" null="1" autoincrement="0">
+<datatype>TINYINT</datatype>
+<default>NULL</default></row>
+<row name="name" null="1" autoincrement="0">
+<datatype>VARCHAR</datatype>
+<default>NULL</default></row>
+<row name="statefp" null="1" autoincrement="0">
+<datatype>VARCHAR</datatype>
+<default>NULL</default></row>
+<row name="geoid" null="1" autoincrement="0">
+<datatype>VARCHAR</datatype>
+<default>NULL</default></row>
+<row name="geometry" null="1" autoincrement="0">
+<datatype>SET</datatype>
+<default>NULL</default></row>
+<key type="PRIMARY" name="">
+<part>id</part>
+</key>
+</table>
+<table x="543" y="396" name="cai_category">
+<row name="id" null="1" autoincrement="1">
+<datatype>TINYINT</datatype>
+<default>NULL</default></row>
+<row name="code" null="1" autoincrement="0">
+<datatype>INT</datatype>
+<default>NULL</default></row>
+<row name="name" null="1" autoincrement="0">
+<datatype>VARCHAR</datatype>
+<default>NULL</default></row>
+<row name="position" null="1" autoincrement="0">
+<datatype>TINYINT</datatype>
+<default>NULL</default></row>
+<row name="display?" null="1" autoincrement="0">
+<datatype>BINARY</datatype>
+<default>NULL</default></row>
+<key type="PRIMARY" name="">
+<part>id</part>
+</key>
+</table>
+<table x="1068" y="219" name="served_area">
+<row name="id" null="1" autoincrement="1">
+<datatype>TINYINT</datatype>
+<default>NULL</default></row>
+<row name="technology_id" null="1" autoincrement="0">
+<datatype>TINYINT</datatype>
+<default>NULL</default><relation table="technology" row="id" />
+</row>
+<row name="commercial" null="1" autoincrement="0">
+<datatype>TINYINT</datatype>
+<default>NULL</default></row>
+<row name="residential" null="1" autoincrement="0">
+<datatype>TINYINT</datatype>
+<default>NULL</default></row>
+<row name="geometry" null="1" autoincrement="0">
+<datatype>SET</datatype>
+<default>NULL</default></row>
+<key type="PRIMARY" name="">
+<part>id</part>
+</key>
+</table>
+</sql>

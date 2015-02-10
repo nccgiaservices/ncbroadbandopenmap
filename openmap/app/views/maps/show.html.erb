@@ -1,0 +1,589 @@
+<%#
+   expects: @map
+            @districts_options
+            @technology_map_styles
+            @cai_category_map_styles
+            @wms_path
+            @technology_relation
+            @cai_category_relation
+ %>
+<%
+    map_centroid_lng_lat = @map.centroid_lng_lat(900913)
+    checkbox_index = 0
+%>
+<% content_for :style do %>
+
+<% end %>
+
+<div id="glass"></div>
+
+<div id="container">
+
+    <div id="intro_container" class="border">
+        <h2>Disclaimer</h2>
+        <div id="disclaimer_container">
+            <%= raw @map.disclaimer %>
+        </div>
+        <button id="intro_button_disagree">Disagree</button>
+        <button id="intro_button_agree">Agree</button>
+        <div style="clear: both;"></div>
+    </div>
+
+    <div id="banner">
+        <%= link_to( image_tag('logo.jpg'), "/") %>
+        <div style="clear: both;"></div>
+    </div>
+    <div class="search_container">
+        <div id="address_container">
+            <%= text_field_tag( 'address', nil, placeholder: 'Enter address, city, county or zip', size: 50, id: 'address_input') %>
+        </div>
+        <div id="district_container">
+            <select id="district_select">
+                <option value="" disabled selected>-Select a District #</option>
+                <%= options_for_select(@districts_options) %>
+            </select>
+        </div>
+        <div id="buttons_container">
+            <div id="help_container">
+                <button id="help" type="button" title="Click here for help"><%= image_tag('question-mark.png') %><br>Help</button>
+            </div>
+            <div id="point_query_container">
+                <button id="point_query" type="button" title="Click the map to show providers at the selected point"><%= image_tag('map-marker.png') %><br>Query Point</button>
+            </div>
+            <div id="location_query_container">
+                <button id="location_query" type="button" title="Show providers at my location"><%= image_tag('radar.png') %><br>Location</button>
+            </div>
+            <div style="clear: both;"></div>
+        </div>
+        <div style="clear: both;"></div>
+    </div>
+    <div id="served_providers" class="border">
+        <div id="served_providers_info">
+            <h2>Provider Info</h2>
+            <p></p>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <%= content_tag :th, "" %>
+              <%= content_tag :th, "Provider" %>
+            </tr>
+          </thead>
+          <tbody>
+          </tbody>
+        </table>
+    </div>
+    <div id="map_button_container">
+        <button id="map_button" type="button">Show Map</button>
+    </div>
+    <div id="map_panel">
+        <div id="map_container"><div id="map_loading">Loading Layers<br><%= image_tag('spinner.gif') %></div></div>
+        <div id="point_query_container_mobile">
+            <button id="point_query_mobile" type="button">Query Point</button>
+        </div>
+
+        <div id="layer_control" class="border">
+            <div id="technologies">
+            <h2>Map Layers</h2>
+                <ul>
+                    <%# these checkboxes need to be ordered in the same sequence as the map.layers are created %>
+                    <% @technology_map_styles.each do |mapstyle| %>
+                      <% technology = @technology_relation.where(id: mapstyle.layerable_id).first %>
+                      <li class="technology_item" id="li_<%= mapstyle.id %>">
+                        <div class="technology_legend" style="background-color: <%= mapstyle.color %>"></div>
+                        <label title="<%= technology.description %>">
+                            <%= check_box_tag( technology.name, 1, false, { id: "layer_#{mapstyle.id}", class: "technology_selector",
+                                                                            data: { layer_name: "view_served_area_#{ServedArea.where(technology_id: mapstyle.layerable_id).first.id}", index: checkbox_index }
+                                                                          } ) %> &nbsp;<%= technology.name %>
+                        </label>
+                      </li>
+                      <% checkbox_index += 1 %>
+                    <% end %>
+                </ul>
+            </div>
+
+            <div id="institutions">
+            <h2>Community Anchor Institutions</h2>
+                <ul>
+                    <% @cai_category_map_styles.each do |mapstyle| %>
+                      <% cai_category = @cai_category_relation.where(id: mapstyle.layerable_id).first %>
+                      <li class="cai_category_item" id="li_<%= mapstyle.id %>" style='background: url(<%= asset_url("#{mapstyle.graphic_name}") %>) no-repeat left/12px;'>
+                        <label title="<%= cai_category.name %>">
+                            <%= check_box_tag( cai_category.name, 1, false, { id: "layer_#{mapstyle.id}", class: "institution_selector",
+                                                                              data: { layer_name: "view_cai_#{mapstyle.layerable_id}", index: checkbox_index }
+                                                                            } ) %> &nbsp;<%= cai_category.name %>
+                        </label>
+                    </li>
+                    <% end %>
+                </ul>
+            </div>
+
+            <div id="google">
+            <h2>Map View</h2>
+                <ul>
+                    <li class="Google_Streets_item"><label><input class="google_selector" value="streets" type="radio" name="google" checked> &nbsp;Google Streets</label></li>
+                    <li class="Satellite_View_item"><label><input class="google_selector" value="satellite" type="radio" name="google"> &nbsp;Satellite View</label></li>
+                </ul>
+                <button id="all_button" type="button">Toggle All Layers</button>
+            </div>
+            <div style="clear: both;"></div>
+        </div>
+
+    </div>
+    <div style="clear: both;"></div>
+</div>
+
+<script type="text/javascript">
+
+var map, gg, sm, center, autocomplete, pointControl, geolocate, hopscotch_timer, original_url;
+var numLoadingLayers = 0;
+var COUNTY_LAYER_INDEX, DISTRICT_LAYER_INDEX, ZIP_CODE_LAYER_INDEX;
+var DEBUG = false;
+
+$(document).ready(function() {
+    original_url = window.location.hash;
+
+    if ($(window).width() > 999) {
+         $('#map_container').css("height", ($(window).height() - ($('#layer_control').height() + 2 * $('.search_container').height())))
+    }
+
+    thelayers = [];
+
+    // map.layers[0]
+    thelayers.push(
+        new OpenLayers.Layer.Google("Google Streets", {
+            displayInLayerSwitcher: true,
+            isBaseLayer: true,
+            numZoomLevels: 17,
+            visibility: true}
+        )
+    );
+
+    // map.layers[1]
+    thelayers.push(
+        new OpenLayers.Layer.Google("Satellite View", {
+            type: google.maps.MapTypeId.HYBRID,
+            displayInLayerSwitcher: true,
+            isBaseLayer: true,
+            numZoomLevels: 17,
+            visibility: false}
+        )
+    );
+
+    // map.layers[2]
+    COUNTY_LAYER_INDEX = thelayers.length;
+    // push in county lines
+    // can't create MapStyle record to represent the counties default layer because it's not one County record, so hard code the settings
+    <% layer_name = "county" %>
+    thelayers.push(
+        new OpenLayers.Layer.WMS("<%= layer_name %>", "<%= @wms_path %>",
+            {layers: "<%= Settings[:geoserver][:workspace] %>:<%= layer_name %>", transparent: true},
+            {visibility: true, opacity: 0.8}
+        )
+    );
+
+    // each county style name will be:  openmap_#{@map.id}_county_#{county.id}_map
+    // ===============================================================================================
+
+    // technology layers
+    <% @technology_map_styles.each do |ms| %>
+      <% layer_name = "view_served_area_#{ServedArea.where(technology_id: ms.layerable_id).first.id}" %>
+      thelayers.push(
+            new OpenLayers.Layer.WMS("<%= layer_name %>", "<%= @wms_path %>",
+                {layers: "<%= Settings[:geoserver][:workspace] %>:<%= layer_name %>", transparent: true},
+                {visibility: false}
+            )
+        );
+    <% end %>
+
+    // cai_category layers
+    <% @cai_category_map_styles.each do |ms| %>
+      <% layer_name = "view_cai_#{ms.layerable_id}" %>
+      thelayers.push(
+            new OpenLayers.Layer.WMS("<%= layer_name %>", "<%= @wms_path %>",
+                {layers: "<%= Settings[:geoserver][:workspace] %>:<%= layer_name %>", transparent: true},
+                {visibility: false}
+            )
+        );
+    <% end %>
+
+    // zip and district layers
+    <% ["zip_code", "district"].each do |layer_name| %>
+        thelayers.push(
+            new OpenLayers.Layer.WMS("<%= layer_name %>", "<%= @wms_path %>",
+                {layers: "<%= Settings[:geoserver][:workspace] %>:<%= layer_name %>", transparent: true},
+                {visibility: true}
+            )
+        );
+    <% end %>
+
+    ZIP_CODE_LAYER_INDEX = thelayers.length-2;
+    DISTRICT_LAYER_INDEX = thelayers.length-1;
+
+    // necessary vector layer
+    thelayers.push(
+        new OpenLayers.Layer.Vector("Vector",
+            {displayInLayerSwitcher: false, visibility: true}
+        )
+    );
+
+    // setup the map
+    map = new OpenLayers.Map({
+        div: "map_container",
+        allOverlays: false,
+        projection: "EPSG:900913",
+        zoom: <%= @map.initial_zoom %>,
+        center: [<%= map_centroid_lng_lat[0] %>, <%= map_centroid_lng_lat[1] %>],        // [-8804594, 4223072],
+        layers: thelayers,
+        eventListeners: {
+            zoomend: function() {
+                // enable CAI Institutions only when zoomed in
+                if (this.getZoom() < 10)
+                    $('#institutions input').each(function(){this.disabled = true});
+                else
+                    $('#institutions input').each(function(){this.disabled = false});
+            }
+        }
+    });
+
+    for (var i = 0; i < map.layers.length; i++) {
+        map.layers[i].events.register('loadstart', this, onLoadStart);
+        map.layers[i].events.register('loadend', this, onLoadEnd);
+    };
+
+    pointControl = new OpenLayers.Control.DrawFeature(
+        map.getLayersByName('Vector')[0],
+        OpenLayers.Handler.Point,
+        {
+            eventListeners: {
+                featureadded: function(e) {
+                    $('#served_providers_info').find("p").html('Showing providers for:<br>Latitude | Longitude<br>' +  e.feature.geometry.y + ' | ' + e.feature.geometry.x);
+                    $('#address_input, #district_select').val('');
+                    $('html, body').animate({ scrollTop: 0 }, 0);
+                    data = { by: 'point', lat: e.feature.geometry.y, lng: e.feature.geometry.x}
+                    updateProviders(data);
+                    this.deactivate();
+                }
+            }
+        }
+    );
+    map.addControl(pointControl);
+
+    geolocate = new OpenLayers.Control.Geolocate({
+        bind: false,
+        geolocationOptions: {
+            enableHighAccuracy: false,
+            maximumAge: 0,
+            timeout: 7000
+        }
+    });
+    map.addControl(geolocate);
+
+    geolocate.events.register("locationupdated",geolocate,function(e) {
+        map.setCenter(new OpenLayers.LonLat(e.point.x, e.point.y), 14);
+        $('#address_input, #district_select').val('');
+        clearMap();
+        data = {by: 'point', lat: e.point.y, lng: e.point.x };
+        updateProviders(data);
+    });
+
+    map.addControl(new OpenLayers.Control.Permalink({anchor: true}));
+    map.addControl(new OpenLayers.Control.ScaleLine());
+    map.addControl(new OpenLayers.Control.MousePosition({prefix:'Longitude | Latitude: ', separator: ' | '}));
+
+    autocomplete = new google.maps.places.Autocomplete($('#address_input')[0]);
+    gg = new OpenLayers.Projection("EPSG:4326");
+    sm = map.getProjectionObject();
+
+    google.maps.event.addListener(autocomplete, 'place_changed', function() {
+        var place = autocomplete.getPlace();
+        if ( place.geometry ) {
+            var str = place.name;
+            $('#district_select').val('');
+            if ( place.geometry.viewport ) {
+                var bounds = new OpenLayers.Bounds(
+                    place.geometry.viewport.getSouthWest().lng(),
+                    place.geometry.viewport.getSouthWest().lat(),
+                    place.geometry.viewport.getNorthEast().lng(),
+                    place.geometry.viewport.getNorthEast().lat()
+                );
+                bounds = bounds.transform(gg, sm);
+                map.zoomToExtent(bounds, true);
+                clearMap();
+
+                if (str.match(/(\D)+County/)) {
+                    sub = str.substring(0, str.lastIndexOf('C')).trim();
+                    activateStyle({by: 'county', name: sub});
+                    data = {by: 'county', name: sub};
+                } else if (str.match(/(\d+)/)) {
+                    activateStyle({by: 'zip', name: str});
+                    data = {by: 'zip', code: str};
+                } else {
+                    data = {
+                        by: 'bounds',
+                        left: place.geometry.viewport.getSouthWest().lng(),
+                        bottom: place.geometry.viewport.getSouthWest().lat(),
+                        top: place.geometry.viewport.getNorthEast().lat(),
+                        right: place.geometry.viewport.getNorthEast().lng()
+                    };
+                }
+                updateProviders(data);
+            } else {
+                center = new OpenLayers.LonLat(place.geometry.location.lng(), place.geometry.location.lat());
+                map.setCenter(center.transform(gg, sm), 14);
+                data = {by: 'point', lat: center.lat, lng: center.lon };
+                updateProviders(data);
+            }
+            $('#served_providers_info').find("p").html('Showing providers at ' + place.formatted_address);
+        } else {
+            return;
+        }
+    });
+
+    if ((navigator.userAgent.match(/iPhone/i)) || (navigator.userAgent.match(/iPod/i)) || (navigator.userAgent.match(/iPad/i))){
+        $('.search_container button').css({
+            "-webkit-appearance": "none",
+            "align-items": "flex-start",
+            "text-align": "center",
+            "cursor": "default",
+            "color": "buttontext",
+            "padding": "2px 6px 3px",
+            "border": "2px outset buttonface",
+            "border-image-source": "initial",
+            "border-image-slice": "initial",
+            "border-image-width": "initial",
+            "border-image-outset": "initial",
+            "border-image-repeat": "initial",
+            "background-color": "buttonface",
+            "box-sizing": "border-box"
+        });
+    }
+
+    // click handlers
+    $(".google_selector[value=streets]").on('click', function(){ map.getLayersByName("Satellite View")[0].setVisibility(false) });
+    $(".google_selector[value=satellite]").on('click', function(){ map.getLayersByName("Satellite View")[0].setVisibility(true) });
+    $("#intro_button_agree").on('click', disclaimerAgree );
+    $("#intro_button_disagree").on('click', function(){ window.location.href='/' });
+    $("#help").on('click', function(){ hopscotch.startTour(tour) });
+    $("#point_query").on('click', queryPoint);
+    $("#location_query").on('click', getLocation );
+    $("#map_button").on('click', toggleMap );
+    $("#point_query_mobile").on('click', queryPoint );
+    $("#all_button").on('click', toggleAllLayers );
+
+    $(".technology_selector, .institution_selector").on('click', function(){
+        var layer = map.getLayersByName($(this).data('layer-name'))[0];
+        layer.setVisibility(this.checked);
+        if (DEBUG) console.log(this.checked, layer);
+    });
+
+    $('#district_select').on('change', function(){
+        $('#address_input').val('');
+        clearMap();
+        var result = $('#district_select option:selected');
+        activateStyle({by: 'district', name: result.text()});
+        updateProviders({by: 'district', district: result.val()});
+        $('#served_providers_info').find("p").html('Showing providers in ' + result.text());
+        //TODO: Reset map to the center point of the selected district, zoom to bounds
+        districtCenter({name: result.text()});
+
+        if (DEBUG) console.log(result.value);
+
+        if (result && result.length == 4) {
+
+            map.setCenter(new OpenLayers.LonLat(result[3], result[2]), 9);
+        }
+    });
+
+    checkControlsFromQueryHash();
+
+});
+
+function cancelHopscotchTimeout() {
+    if (hopscotch_timer) {
+        clearTimeout(hopscotch_timer);
+        hopscotch_timer = null;
+    }
+}
+
+function checkControlsFromQueryHash() {
+    var hashmarks = location.hash.split("layers=B0")[1];
+    if (DEBUG) console.log(hashmarks);
+    if (hashmarks) {
+        for (var i = 1 ; i < hashmarks.length; i++) {
+            if (hashmarks[i] == "T") {
+                if (DEBUG) console.log(i);
+                if ( cb = $(".technology_selector, .institution_selector")[i-1] ) {
+                    if (DEBUG) console.log(true);
+                    $(cb).prop("checked", true);
+                }
+            }
+        }
+    }
+}
+
+function checkIDs() {
+    $('[id]').each(function(){var ids = $('[id="'+this.id+'"]'); if(ids.length>1 && ids[0]==this) console.log('Multiple IDs #'+this.id);});
+}
+
+function clearMap() {
+    if (map) {
+        map.getLayersByName('Vector')[0].removeAllFeatures();
+        map.layers[COUNTY_LAYER_INDEX].mergeNewParams({styles: "openmap_<%= @map.id %>_county_default"});
+        map.layers[ZIP_CODE_LAYER_INDEX].mergeNewParams({styles: "openmap_<%= @map.id %>_zip_default"});
+        map.layers[DISTRICT_LAYER_INDEX].mergeNewParams({styles: "openmap_<%= @map.id %>_district_default"});
+        if (DEBUG) console.log("Map cleared");
+    }
+}
+
+function disclaimerAgree() {
+    $('#intro_container').hide();
+    $('#glass').hide();
+    if (original_url.length == 0) {
+        getLocation();
+    } else {
+        data = {by: 'point', lat: map.getCenter().lat, lng: map.getCenter().lon };
+        updateProviders(data);
+        $('#served_providers_info').find("p").html('Showing providers for:<br>Latitude | Longitude<br>' +  map.getCenter().lat + ' | ' + map.getCenter().lon);
+    }
+    $('html, body').animate({ scrollTop: 0 }, 0);
+    $('#container > :not(#intro_container)').css('visibility', 'visible');
+}
+
+function getLocation() {
+    $('#served_providers').find("tbody").html('<tr><td colspan="4">Finding your location<br><%= image_tag("spinner.gif") %></td></tr>');
+    $('#served_providers_info').find("p").html('Showing providers at your location');
+    geolocate.deactivate();
+    geolocate.watch = false;
+    geolocate.activate();
+}
+
+function onLoadEnd(evt) {
+    numLoadingLayers--;
+    if (numLoadingLayers == 0) {
+       $('#map_loading').css('display', 'none');
+    };
+}
+
+function onLoadStart(evt) {
+    if(numLoadingLayers == 0) {
+        $('#map_loading').css('display', 'block');
+    }
+    numLoadingLayers++;
+}
+
+function queryPoint() {
+    clearMap();
+    pointControl.activate();
+}
+
+function toggleAllLayers() {
+    // if any checked, uncheck them all
+    checked = $('.technology_selector:checked').size() > 0;
+    $(".technology_selector").prop('checked', !checked).each(function(){
+        var layer = map.getLayersByName($(this).data('layer-name'))[0];
+        layer.setVisibility(this.checked);
+        if (DEBUG) console.log(this.checked, layer);
+    });
+}
+
+function toggleMap() {
+    visibility = $('#map_container').css("visibility") == "hidden" ? "visible" : "hidden";
+    display = visibility == "visible" ? "block" : "none";
+    $('#map_container').css("visibility", visibility);
+    $('.olControlScaleLine.olControlNoSelect').css("display", display);
+    $('#layer_control').css("display", display);
+    $('#point_query_container_mobile').css("display", display);
+    $('#map_button_container button').html(visibility == "visible" ? "Hide Map" : "Show Map");
+}
+
+function updateProviders(params) {
+    $('#served_providers').find("tbody").html('<tr><td colspan="2">Loading Providers<br><%= image_tag("spinner.gif") %></td></tr>');
+    $.ajax({
+        url: '<%= @provider_service_path %>',
+        data: params,
+        dataType: 'html',
+        type: 'GET',
+        success: function(data){
+            $("#served_providers").find("tbody").html(data);
+        },
+        error: function(){
+            $("#served_providers").html('Could not load providers');
+        }
+    });
+}
+
+function activateStyle(params) {
+    $.ajax({
+        url: '<%= @style_path %>',
+        data: params,
+        dataType: 'json',
+        type: 'GET',
+        success: function(data) {
+            var index = 0;
+            switch (params.by) {
+                case 'county' :
+                    index = COUNTY_LAYER_INDEX; break;
+                case 'zip' :
+                    index = ZIP_CODE_LAYER_INDEX; break;
+                case 'district' :
+                    index = DISTRICT_LAYER_INDEX; break;
+            }
+            map.layers[index].mergeNewParams({styles: "openmap_<%= @map.id %>_"+ params.by +"_"+ data.id +"_map"});
+        },
+        error: function() {
+            console.log("GID error");
+        }
+    });
+}
+
+function districtCenter(params) {
+    $.ajax({
+        url: '<%= @district_path %>',
+        data: params,
+        dataType: 'json',
+        type: 'GET',
+        success: function(data) {
+            result = data.center.split(' ');
+            map.setCenter(new OpenLayers.LonLat(parseFloat(/-?[0-9, .]+/.exec(result[0])), parseFloat(/-?[0-9, .]+/.exec(result[1]))), 8);
+        },
+        error: function() {
+            console.log("District center error");
+        }
+    });
+}
+
+// ----------------------------
+$(window).resize( function() {
+    if ($(window).width() > 999) {
+        $('#map_container').css("height", ($(window).height() - ($('#layer_control').height() + 2 * $('.search_container').height())))
+    }
+});
+
+(function pacSelectFirst(input){
+    var _addEventListener = (input.addEventListener) ? input.addEventListener : input.attachEvent;
+    function addEventListenerWrapper(type, listener) {
+    if (type == "keydown") {
+      var orig_listener = listener;
+      listener = function (event) {
+        var suggestion_selected = $(".pac-item-selected").length > 0;
+        if (event.which == 13 && !suggestion_selected) {
+          var simulated_downarrow = $.Event("keydown", {keyCode:40, which:40})
+          orig_listener.apply(input, [simulated_downarrow]);
+        }
+        orig_listener.apply(input, [event]);
+      };
+    }
+    _addEventListener.apply(input, [type, listener]);
+  }
+  if (input.addEventListener)
+    input.addEventListener = addEventListenerWrapper;
+  else if (input.attachEvent)
+    input.attachEvent = addEventListenerWrapper;
+})($('#address_input')[0]);
+
+$('#address_input')[0].addEventListener('click', function(){
+    $('#address_input')[0].value = "";
+})
+
+</script>

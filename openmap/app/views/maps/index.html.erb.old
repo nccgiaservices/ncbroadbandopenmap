@@ -1,0 +1,471 @@
+<% content_for :style do %>
+
+<% end %>
+
+<%
+    all_layers = []
+
+    MapLayer.where(layer_class: ['technology', 'institution']).order(:position).each do |layer|
+        all_layers << { title: layer.layer_name, opacity: layer.opacity, visibility: layer.default_visiblity, layer_class: layer.layer_class, description: layer.description }
+    end
+
+    all_layers << {  title: "NC_ZipCodes",        opacity: 1,   visibility: true,   layer_class: "other"  }
+    all_layers << {  title: "NCHouseDistricts",   opacity: 1,   visibility: true,   layer_class: "other"  }
+    all_layers << {  title: "NCSenateDistricts",  opacity: 1,   visibility: true,   layer_class: "other"  }
+    all_layers << {  title: "USHouseDistricts",   opacity: 1,   visibility: true,   layer_class: "other"  }
+    all_layers << { title: "County Lines",  opacity: 0.7,  visibility: true,  layer_class: "other" }
+
+%>
+
+<div id="glass"></div>
+
+<div id="container">
+
+    <%= render :partial => "disclaimer" %>
+
+    <div id="banner">
+        <a href="/"><img src="/images/logo.jpg"></a>
+        <div style="clear: both;"></div>
+    </div>
+    <div class="search_container">
+        <div id="address_container">
+            <%= text_field_tag( 'address', nil, placeholder: 'Enter address, city, county or zip', size: 50, id: 'address_input') %>
+        </div>
+        <div id="district_container">
+            <select id="district_select">
+                <option value="" disabled selected>-Select a District # - Legislator-</option>
+                <%= grouped_options_for_select(LegislativeDistrictsView.key_data.ordered.all.group_by{|d| d.legislation_display}.map{|k,v| [ k, v.map{|d| [d.name,d.key]} ]}) %>
+            </select>
+        </div>
+        <div id="buttons_container">
+            <div id="help_container">
+                <button id="help" type="button" onclick="hopscotch.startTour(tour)" title="Click here for help"><img src="/images/question-mark.png"><br>Help</button>
+            </div>
+            <div id="point_query_container">
+                <button id="point_query" type="button" onclick="queryPoint()" title="Click the map to show providers at the selected point"><img src="/images/map-marker.png"><br>Query Point</button>
+            </div>
+            <div id="location_query_container">
+                <button id="location_query" type="button" onclick="getLocation()" title="Show providers at my location"><img src="/images/radar.png"><br>Location</button>
+            </div>
+            <div style="clear: both;"></div>
+        </div>
+        <div style="clear: both;"></div>
+    </div>
+    <div id="served_providers" class="border">
+        <div id="served_providers_info">
+            <h2>Provider Info</h2>
+            <p></p>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <%= content_tag :th, "" %>
+              <%= content_tag :th, "Provider" %>
+            </tr>
+          </thead>
+          <tbody>
+          </tbody>
+        </table>
+    </div>
+    <div id="map_button_container">
+            <button id="map_button" type="button" onclick="toggleMap()">Show Map</button>
+    </div>
+    <div id="map_panel">
+        <div id="map_container"><div id="map_loading">Loading Layers<br><img src="/images/spinner.gif"></div></div>
+        <div id="point_query_container_mobile">
+            <button id="point_query_mobile" type="button" onclick="queryPoint()">Query Point</button>
+        </div>
+        <%= render :partial => "layer_control", :locals => { :all_layers => all_layers } %>
+    </div>
+    <div style="clear: both;"></div>
+</div>
+
+<script type="text/javascript">
+
+var map, gg, sm, center, autocomplete, pointControl, geolocate, hopscotch_timer, original_url;
+var numLoadingLayers = 0;
+
+$(document).ready(function() {
+    original_url = window.location.hash;
+
+    if ($(window).width() > 999) {
+         $('#map_container').css("height", ($(window).height() - ($('#layer_control').height() + 2 * $('.search_container').height())))
+    }
+
+    $(".google_selector[value=streets]").on('click', function () {
+        map.getLayersByName("Satellite View")[0].setVisibility(false);
+    });
+    $(".google_selector[value=satellite]").on('click', function () {
+        map.getLayersByName("Satellite View")[0].setVisibility(true);
+    });
+
+    thelayers = [];
+
+    thelayers.push(
+        new OpenLayers.Layer.Google(
+            "Google Streets",
+            {
+                numZoomLevels: 17,
+                visibility: true,
+                displayInLayerSwitcher: true,
+                isBaseLayer: true
+            }
+        )
+    );
+
+    thelayers.push(
+        new OpenLayers.Layer.Google(
+            "Satellite View",
+            {
+                type: google.maps.MapTypeId.HYBRID,
+                numZoomLevels: 17,
+                visibility: false,
+                displayInLayerSwitcher: true,
+                isBaseLayer: true
+            }
+        )
+    );
+
+    <% all_layers.each do |layer| %>
+        thelayers.push(
+            new OpenLayers.Layer.WMS("<%= layer[:title] %>",
+                "<%= Rails.env.development? ? 'http://opengeo-01.e-nc.org:9080/geoserver/wms' : '/geoserver' %>",
+                {layers: "opengeo:<%= layer[:title] %>",
+                transparent: true},
+                {visibility: <%= layer[:visibility] %>,
+                   opacity: <%= layer[:opacity] %>}
+            )
+        );
+    <% end %>
+
+    thelayers.push(
+        new OpenLayers.Layer.Vector("Vector",
+            {displayInLayerSwitcher: false,
+               visibility: true}
+        )
+    );
+
+    map = new OpenLayers.Map({
+        div: "map_container",
+        allOverlays: false,
+        projection: "EPSG:900913",
+        zoom: 7,
+        center: [-8804594, 4223072],
+        layers: thelayers,
+        eventListeners: {
+            zoomend: function() {
+                if(this.getZoom() < 10)
+                {
+                    $('#institutions input').each(function(index) {
+                        this.disabled = true;
+                    });
+                }
+                else {
+                    $('#institutions input').each(function(index) {
+                        this.disabled = false;
+                    });
+                }
+            }
+        }
+    });
+
+    for (var i = 0; i < map.layers.length; i++) {
+        map.layers[i].events.register('loadstart', this, onLoadStart);
+        map.layers[i].events.register('loadend', this, onLoadEnd);
+    };
+
+    pointControl = new OpenLayers.Control.DrawFeature(
+        map.getLayersByName('Vector')[0],
+        OpenLayers.Handler.Point,
+        {
+            eventListeners: {
+                featureadded: function(e) {
+                    $('#served_providers_info').find("p").html('Showing providers for:<br>Latitude | Longitude<br>' +  e.feature.geometry.y + ' | ' + e.feature.geometry.x);
+                    $('#address_input, #district_select').val('');
+                    $('#district_select').val('');
+                    clearMap();
+                    $('html, body').animate({ scrollTop: 0 }, 0);
+                    data = { by: 'point', lat: e.feature.geometry.y, lng: e.feature.geometry.x}
+                    updateProviders(data);
+                    this.deactivate();
+                }
+            }
+        }
+    );
+    map.addControl(pointControl);
+
+    geolocate = new OpenLayers.Control.Geolocate({
+        bind: false,
+        geolocationOptions: {
+            enableHighAccuracy: false,
+            maximumAge: 0,
+            timeout: 7000
+        }
+    });
+    map.addControl(geolocate);
+    geolocate.events.register("locationupdated",geolocate,function(e) {
+        map.setCenter(new OpenLayers.LonLat(e.point.x, e.point.y), 14);
+        clearMap();
+        $('#address_input, #district_select').val('');
+        data = {by: 'point', lat: e.point.y, lng: e.point.x };
+        updateProviders(data);
+    });
+
+    map.addControl(new OpenLayers.Control.Permalink({anchor: true}));
+    map.addControl(new OpenLayers.Control.ScaleLine());
+    map.addControl(new OpenLayers.Control.MousePosition({prefix:'Longitude | Latitude: ', separator: ' | '}));
+
+    autocomplete = new google.maps.places.Autocomplete($('#address_input')[0]);
+    gg = new OpenLayers.Projection("EPSG:4326");
+    sm = map.getProjectionObject();
+
+    google.maps.event.addListener(autocomplete, 'place_changed', function() {
+        var place = autocomplete.getPlace();
+        if ( place.geometry ) {
+            var str = place.name;
+            $('#district_select').val('');
+            if ( place.geometry.viewport ) {
+                var bounds = new OpenLayers.Bounds(
+                    place.geometry.viewport.getSouthWest().lng(),
+                    place.geometry.viewport.getSouthWest().lat(),
+                    place.geometry.viewport.getNorthEast().lng(),
+                    place.geometry.viewport.getNorthEast().lat()
+                );
+                bounds = bounds.transform(gg, sm);
+                map.zoomToExtent(bounds, true);
+                clearMap();
+
+                if (str.match(/(\D)+County/)) {
+                    sub = str.substring(0, str.lastIndexOf('C')).trim();
+                    map.layers[2].mergeNewParams({styles: "County Lines_" + sub});
+                    data = {by: 'county', name: sub};
+                } else if (str.match(/(\d+)/)) {
+                    map.layers[14].mergeNewParams({styles: "NC_ZipCodes_" + str});
+                    data = {by: 'zip', code: str};
+                } else {
+                    data = {
+                                by: 'bounds',
+                                left: place.geometry.viewport.getSouthWest().lng(),
+                                bottom: place.geometry.viewport.getSouthWest().lat(),
+                                top: place.geometry.viewport.getNorthEast().lat(),
+                                right: place.geometry.viewport.getNorthEast().lng()
+                            };
+                }
+                updateProviders(data);
+            } else {
+                center = new OpenLayers.LonLat(place.geometry.location.lng(), place.geometry.location.lat());
+                map.setCenter(center.transform(gg, sm), 14);
+                data = {by: 'point', lat: center.lat, lng: center.lon };
+                updateProviders(data);
+            }
+            $('#served_providers_info').find("p").html('Showing providers at ' + place.formatted_address);
+        } else {
+            return;
+        }
+    });
+
+    $('#district_select').on('change', function(){
+        $('#address_input').val('');
+        var result = this.value.split('+');
+        if (result && result.length == 4) {
+            $('#served_providers_info').find("p").html('Showing providers in the district you selected');
+            data = {by: 'district', legislation: result[0], district: result[1] };
+            updateProviders(data);
+            clearMap();
+
+            map.setCenter(new OpenLayers.LonLat(result[3], result[2]), 9);
+            if (result[0].match(/NC_House/)){
+                map.layers[15].mergeNewParams({styles: result[0] + '_' + result[1]});
+            } else if (result[0].match(/NC_Senate/)){
+                map.layers[16].mergeNewParams({styles: result[0] + '_' + result[1]});
+            } else {
+                map.layers[17].mergeNewParams({styles: result[0] + '_' + result[1]});
+            }
+        }
+    });
+
+    if ((navigator.userAgent.match(/iPhone/i)) || (navigator.userAgent.match(/iPod/i)) || (navigator.userAgent.match(/iPad/i))){
+        $('.search_container button').css({
+            "-webkit-appearance": "none",
+            "align-items": "flex-start",
+            "text-align": "center",
+            "cursor": "default",
+            "color": "buttontext",
+            "padding": "2px 6px 3px",
+            "border": "2px outset buttonface",
+            "border-image-source": "initial",
+            "border-image-slice": "initial",
+            "border-image-width": "initial",
+            "border-image-outset": "initial",
+            "border-image-repeat": "initial",
+            "background-color": "buttonface",
+            "box-sizing": "border-box"
+        });
+    }
+
+    $('#glass').show();
+    checkControls();
+});
+
+function cancelHopscotchTimeout() {
+    if (hopscotch_timer) {
+        clearTimeout(hopscotch_timer);
+        hopscotch_timer = null;
+    }
+};
+
+function onLoadStart (evt) {
+    if(numLoadingLayers == 0) {
+        $('#map_loading').css('display', 'block');
+    }
+    numLoadingLayers++;
+};
+
+function onLoadEnd(evt) {
+    numLoadingLayers--;
+    if (numLoadingLayers == 0) {
+       $('#map_loading').css('display', 'none');
+    };
+};
+
+function checkControls() {
+    var layers = location.hash.split("layers=B0")[1];
+    if (layers) {
+        for (var i = 0; i < layers.length; i++) {
+            if (layers[i] == "T"){
+                $('#layer_' + i).prop("checked", true);
+            }
+        }
+    }
+};
+
+function layerCheck(cb) {
+    var layer = map.getLayersByName(cb.name )[0];
+    if (cb.checked) {
+      layer.setVisibility(true);
+    } else {
+      layer.setVisibility(false);
+    }
+};
+
+function checkAllLayers() {
+    var layers = map.layers;
+    var boxes = $(':checkbox');
+    for (var i = 0; i < boxes.length; i++) {
+        if (!boxes[i].checked) {
+            break;
+        } else {
+            $(boxes[i]).prop("checked", false);
+            layers[i+3].setVisibility(false);
+            if(i == boxes.length - 1) {
+                return;
+            }
+        }
+    };
+    for (var i = 3; i < 14; i++) {
+        layers[i].setVisibility(true);
+        checkControls();
+    };
+};
+
+function queryPoint() {
+    map.getLayersByName('Vector')[0].removeAllFeatures();
+    pointControl.activate();
+};
+
+function getLocation() {
+    $('#served_providers').find("tbody").html('<tr><td colspan="4">Finding your location<br><img src="/images/spinner.gif"></td></tr>');
+    $('#served_providers_info').find("p").html('Showing providers at your location');
+    geolocate.deactivate();
+    geolocate.watch = false;
+    geolocate.activate();
+};
+
+function clearMap() {
+    if (map) {
+        map.getLayersByName('Vector')[0].removeAllFeatures();
+        map.layers[2].mergeNewParams({styles: "opengeo_CountiesNC_OSM"});
+        map.layers[14].mergeNewParams({styles: "opengeo_NC_ZipCodes"});
+        map.layers[15].mergeNewParams({styles: "opengeo_NCHouseDistricts"});
+        map.layers[16].mergeNewParams({styles: "opengeo_NCSenateDistricts"});
+        map.layers[17].mergeNewParams({styles: "opengeo_USHouseDistricts"});
+    }
+};
+
+function toggleMap() {
+    if ($('#map_container').css("visibility") == "hidden") {
+        $('#map_container').css("visibility", "visible");
+        $('.olControlScaleLine').css("display", "block");
+        $('#layer_control').show();
+        $('#point_query_container_mobile').show();
+        $('#map_button_container button').html("Hide Map");
+    } else {
+        $('#map_container').css("visibility", "hidden");
+        $('.olControlScaleLine').css("display", "none");
+        $('#layer_control').hide();
+        $('#point_query_container_mobile').hide();
+        $('#map_button_container button').html("Show Map");
+    }
+}
+
+function disclaimerAgree() {
+    $('#intro_container').hide();
+    $('#glass').hide();
+    if (original_url.length == 0) {
+        getLocation();
+    } else {
+        data = {by: 'point', lat: map.getCenter().lat, lng: map.getCenter().lon };
+        updateProviders(data);
+        $('#served_providers_info').find("p").html('Showing providers for:<br>Latitude | Longitude<br>' +  map.getCenter().lat + ' | ' + map.getCenter().lon);
+    }
+    $('html, body').animate({ scrollTop: 0 }, 0);
+    $('#container > :not(#intro_container)').css('visibility', 'visible');
+}
+
+$(window).resize( function() {
+    if ($(window).width() > 999) {
+        $('#map_container').css("height", ($(window).height() - ($('#layer_control').height() + 2 * $('.search_container').height())))
+    }
+});
+
+(function pacSelectFirst(input){
+    var _addEventListener = (input.addEventListener) ? input.addEventListener : input.attachEvent;
+    function addEventListenerWrapper(type, listener) {
+    if (type == "keydown") {
+      var orig_listener = listener;
+      listener = function (event) {
+        var suggestion_selected = $(".pac-item-selected").length > 0;
+        if (event.which == 13 && !suggestion_selected) {
+          var simulated_downarrow = $.Event("keydown", {keyCode:40, which:40})
+          orig_listener.apply(input, [simulated_downarrow]);
+        }
+        orig_listener.apply(input, [event]);
+      };
+    }
+    _addEventListener.apply(input, [type, listener]);
+  }
+  if (input.addEventListener)
+    input.addEventListener = addEventListenerWrapper;
+  else if (input.attachEvent)
+    input.attachEvent = addEventListenerWrapper;
+})($('#address_input')[0]);
+$('#address_input')[0].addEventListener('click', function(){
+    $('#address_input')[0].value = "";
+});
+
+function updateProviders(params) {
+    $('#served_providers').find("tbody").html('<tr><td colspan="2">Loading Providers<br><img src="/images/spinner.gif"></td></tr>');
+    $.ajax({
+        url: '<%= broadband_map_providers_path %>',
+        data: params,
+        dataType: 'html',
+        type: 'GET',
+        success: function(data){
+            $("#served_providers").find("tbody").html(data);
+        },
+        error: function(){
+            $("#served_providers").html('Could not load providers');
+        }
+    });
+}
+</script>

@@ -1,0 +1,37 @@
+#
+# config.yml
+#
+# These configuration settings are read by the Settings class. See that class for details.
+#
+default:
+  map:
+    name: "NC Broadband"
+    # important! - don't change this willy nilly - this value is saved in the database to identify the default map
+  geoserver:
+    protocol: "http"
+    host: "localhost"
+    port: "8080"
+    username: "admin"
+    password: "geoserver"
+    workspace: "OpenMap"
+    datastore: "OpenMap_datastore"
+    postgis_schema: "public"
+    wms_path: ""
+    # if wms_path is absent or blank, it will default to #{protocol}://#{host}:#{port}/geoserver/wms
+
+development:
+  # override here if needed
+
+staging:
+  geoserver:
+    username: "admin_staging"
+    password: "geoserver_staging"
+
+production:
+  geoserver:
+    protocol: "http"
+    host: "ncc432.its.state.nc.us"
+    username: "admin"
+    password: "openmap"
+    wms_path: "/geoserver"
+    # if a wms_path is specified, the explicit path will be used
